@@ -1,9 +1,7 @@
-'use client';
+'use client'; // ブラウザ側で動く部品であることを明示
 
-import { useEffect, useState } from 'react';
-// 以前のスクリーンショットに基づき、src/lib/supabase.ts の正しい場所を指すように修正します。
-// app/page.tsx から見ると、src/lib/supabase.ts は ../src/lib/supabase になります。
-import { supabase } from '../src/lib/supabase';
+import { useEffect, useState } from 'react';  //この一行を書くところからスタートするのが標準的なお作法 タイミングをコントロールして（useEffect）」「データを保持・更新する（useState）
+import { supabase } from '../src/lib/supabase'; // 自作の接続設定 あらかじめ別のファイルで作っておいた『接続済みの窓口（supabaseオブジェクト）』を、このファイルに持ってくる
 
 export default function Home() {
   const [posts, setPosts] = useState<any[]>([]);
