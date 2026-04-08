@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';  //この一行を書くところからスタートするのが標準的なお作法 タイミングをコントロールして（useEffect）」「データを保持・更新する（useState）
 import { supabase } from '../src/lib/supabase'; // 自作の接続設定 あらかじめ別のファイルで作っておいた『接続済みの窓口（supabaseオブジェクト）』を、このファイルに持ってくる
+import Link from 'next/link';
 
 //データの器を用意
 export default function Home() {
@@ -9,6 +10,7 @@ export default function Home() {
   //posts:投稿内容を入れる箱  DBから届いたデータの保存
   //setPosts:配列に取得したデータを入れて更新させるもの
   const [loading, setLoading] = useState(true); //loading:処理中判定
+  const [isMenuOpen, setIsMenuOpen] = useState(false);  //メニューが開いているかを覚える定数
 
 //データ取得の関数定義
   const fetchPosts = async () => {
@@ -57,6 +59,33 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-orange-50 p-4 md:p-8 text-black">
       <div className="max-w-2xl mx-auto">
+      {/* 1. ハンバーガーボタン */}
+      <button onClick={() => setIsMenuOpen(true)}
+        className="p-3 bg-white rounded-2xl shadow-sm text-stone-600 hover:text-orange-600 transition-all active:scale-95">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>
+        </svg>
+      </button>
+      {/* 2. スライドメニュー（isOpenがtrueのときだけ現れる） */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-stone-800 shadow-2xl transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-8">
+          <button onClick={() => setIsMenuOpen(false)} className="mb-8 text-stone-400 hover:text-white">
+            ✕ 閉じる
+          </button>
+          <nav className="space-y-6">
+            <Link href="/" className="block text-lg font-bold text-white hover:text-orange-400 transition-colors" onClick={() => setIsMenuOpen(false)}>ホーム</Link>
+            <Link href="/post" className="block text-lg font-bold text-white hover:text-orange-400">投稿ページ</Link>
+            <Link href="/mypage" className="block text-lg font-bold text-white hover:text-orange-400">マイページ</Link>
+          </nav>
+        </div>
+      </div>
+      {/* 3. 背景のぼかし（メニュー以外をタップで閉じる用） */}
+      {isMenuOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" 
+          onClick={() => setIsMenuOpen(false)} 
+        />
+      )}
         {/* ヘッダーと「記録する」ボタン */}
         <header className="flex justify-between items-end mb-10">
           <div>
