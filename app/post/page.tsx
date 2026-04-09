@@ -61,9 +61,9 @@ export default function PostPage() {
         for (const tagName of tags) {
           const { data: tagData, error: tagError } = await supabase
             .from('tags')
-            .upsert({ tag_name: tagName }, { onConflict: 'tag_name' })
-            .select()
-            .single();
+            .upsert({ tag_name: tagName }, { onConflict: 'tag_name' })  // 「あれば使う、なければ作る」を判断
+            .select() // その結果を画面（プログラム）に戻して！
+            .single();  // データは1件だけのはずだから、1件として扱って！
 
           if (tagError) throw tagError;
 
