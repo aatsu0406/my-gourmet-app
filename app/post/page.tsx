@@ -1,64 +1,58 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-/**
- * インポートパスの修正:
- * アップロードされた画像 image_990c2e.png のディレクトリ構造を再確認しました。
- * - src/lib/supabase.ts
- * - app/post/page.tsx
- * * プレビュー環境のビルドにおいて、'../../src/lib/supabase' では解決できない場合があるため、
- * より直接的な相対パス、あるいは環境に合わせたパス指定を試行します。
- */
+import { useState, useEffect, SubmitEvent } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function PostPage() {
-  const [shopName, setShopName] = useState('');
-  const [comment, setComment] = useState('');
-  const [rating, setRating] = useState(5);
-  const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const router = useRouter();
+  const [shopName, setShopName] = useState(''); // 店舗名の入力内容を覚える
+  const [comment, setComment] = useState(''); // コメントの入力内容を覚える
+  const [rating, setRating] = useState(5);  // 評価（★の数）を覚える。初期値は5
+  const [tagInput, setTagInput] = useState(''); // 今入力中の「タグ1つ分」の文字
+  const [tags, setTags] = useState<string[]>([]); // 確定して並んでいる「タグのリスト」
+  const [loading, setLoading] = useState(false);  // 投稿ボタン連打防止用の「通信中フラグ」
+  const [mounted, setMounted] = useState(false);  // 画面がブラウザで表示されたか判定
+  const router = useRouter(); // 投稿後に画面を切り替えるための道具
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  //タグを確定させる
   const addTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
+    if (e.key === 'Enter' && tagInput.trim()) { // Enterが押され、かつ文字があれば
+      e.preventDefault(); // 本来のEnterの動き（送信など）を止める
+      if (!tags.includes(tagInput.trim())) {  // まだ同じタグがリストになければ
+        setTags([...tags, tagInput.trim()]);  // 今までのタグリストに新しいタグを追加！
       }
-      setTagInput('');
+      setTagInput('');  // 入力欄を空っぽにする
     }
   };
 
+  //間違えて追加してしまったタグを、ポチッと消すための処理
   const removeTag = (indexToRemove: number) => {
-    setTags(tags.filter((_, index) => index !== indexToRemove));
+    setTags(tags.filter((_, index) => index !== indexToRemove));  // 指定した番号以外を残す（＝削除）
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supabase) return;
-    setLoading(true);
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {  //「フォームが送信された」というイベント情報 e を受け取る
+    e.preventDefault(); // 画面のリロードを防ぐ
+    if (!supabase) return;  //DBとの接続準備ができていなかったら、ここで処理を中止
+    setLoading(true);  // 「投稿中...」状態にしてボタンを無効化
 
     try {
       // 1. postsテーブルへ保存
       const { data: postData, error: postError } = await supabase
         .from('posts')
         .insert([{ shop_name: shopName, comment: comment, rating: rating }])
-        .select()
-        .single();
+        .select() // 保存した直後のデータ（IDなど）を返してもらう
+        .single();  // 1件だけなのでオブジェクトとして受け取る
 
-      if (postError) throw postError;
+      if (postError) throw postError; // 失敗したらcatchブロックへ飛ばす
 
       // 2. タグの保存と紐付け
       if (tags.length > 0) {
-        for (const tagName of tags) {
+        for (const tagName of tags) { // タグの数だけ繰り返す
           const { data: tagData, error: tagError } = await supabase
             .from('tags')
             .upsert({ tag_name: tagName }, { onConflict: 'tag_name' })  // 「あれば使う、なければ作る」を判断
@@ -67,13 +61,15 @@ export default function PostPage() {
 
           if (tagError) throw tagError;
 
+          // 中間テーブルに「この投稿」と「このタグ」のIDをセットで保存
           await supabase
             .from('post_tags')
             .insert({ post_id: postData.id, tag_id: tagData.id });
         }
       }
 
-      router.push('/');   //自動でホームに戻る
+      router.push('/');   // ホーム画面へ自動で戻る（Next.jsの便利な機能）
+      // 入力欄をリセット（念のため）
       setShopName('');
       setComment('');
       setTags([]);
@@ -114,7 +110,7 @@ export default function PostPage() {
                 type="text"
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none font-bold text-black"
                 value={shopName}
-                onChange={(e) => setShopName(e.target.value)}
+                onChange={(e) => setShopName(e.target.value)} // 文字が打たれるたびにStateを更新
                 placeholder="店舗名を入力"
                 required
               />
@@ -134,7 +130,7 @@ export default function PostPage() {
                 type="text"
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none text-sm font-bold text-black"
                 value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
+                onChange={(e) => setTagInput(e.target.value)} // 文字が打たれるたびにStateを更新
                 onKeyDown={addTag}
                 placeholder="ハッシュタグを入力してEnter"
               />
@@ -145,7 +141,7 @@ export default function PostPage() {
               <select 
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none font-bold text-orange-500"
                 value={rating}
-                onChange={(e) => setRating(Number(e.target.value))}
+                onChange={(e) => setRating(Number(e.target.value))} 
               >
                 {[5, 4, 3, 2, 1].map(v => (
                   <option key={v} value={v}>{'★'.repeat(v)}{'☆'.repeat(5-v)}</option>
@@ -158,14 +154,14 @@ export default function PostPage() {
               <textarea
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl h-32 focus:ring-4 focus:ring-orange-100 outline-none text-sm font-medium resize-none text-black"
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(e) => setComment(e.target.value)}  // 文字が打たれるたびにStateを更新
                 placeholder="内容を入力してください"
               />
             </div>
 
             <button 
               type="submit" 
-              disabled={loading} 
+              disabled={loading} // 通信中はボタンを押せなくする
               className={`w-full py-5 rounded-2xl font-black text-white shadow-lg transition-all ${
                 loading ? 'bg-slate-300' : 'bg-zinc-400 hover:bg-orange-600 active:scale-95'
               }`}
