@@ -28,7 +28,7 @@ export default function Home() {
             )
           )
         `)
-        .order('created_at', { ascending: false }); //昇順ソート
+        .order('created_at', { ascending: false }); //降順ソート
 
       if (error) {  //エラーあればコンソールに表示
         console.error('データの取得に失敗しました:', error.message);
@@ -36,8 +36,8 @@ export default function Home() {
         console.log('取得したデータ:', data);
         setPosts(data || []);
       }
-    } catch (err) { //予期せぬエラー時のハンドリング
-      console.error('予期せぬエラーが発生しました:', err);
+    } catch (error_from_system) { //予期せぬエラー時のハンドリング
+      console.error('予期せぬエラーが発生しました:', error_from_system);
     } finally { //最終的に読み込み中スイッチのOFF
       setLoading(false);
     }
@@ -136,7 +136,7 @@ export default function Home() {
                 <div className="flex justify-end items-center border-t border-gray-100 pt-3">
                   <span className="text-[10px] text-gray-400 font-bold">
                     {/* 日付の変換 */}
-                    {new Date(post.created_at).toLocaleDateString('ja-JP')}
+                    {new Date(post.created_at).toLocaleString('ja-JP')}
                   </span>
                 </div>
               </article>
