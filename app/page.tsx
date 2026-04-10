@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';  //この一行を書くところからスタートするのが標準的なお作法 タイミングをコントロールして（useEffect）」「データを保持・更新する（useState）
 import { supabase } from '../src/lib/supabase'; // 自作の接続設定 あらかじめ別のファイルで作っておいた『接続済みの窓口（supabaseオブジェクト）』を、このファイルに持ってくる
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // 画面遷移のための道具
 
 //データの器を用意
 export default function Home() {
@@ -11,6 +12,12 @@ export default function Home() {
   //setPosts:配列に取得したデータを入れて更新させるもの
   const [loading, setLoading] = useState(true); //loading:処理中判定
   const [isMenuOpen, setIsMenuOpen] = useState(false);  //メニューが開いているかを覚える定数
+  const router = useRouter(); //画面遷移のための道具
+  // 編集ボタンを押した時の動き
+  const handleEdit = (id: number) => {
+    // 投稿ページに「id」をくっつけて飛ばす！
+    router.push(`/post?id=${id}`);
+  };
 
 //データ取得の関数定義
   const fetchPosts = async () => {
@@ -42,6 +49,30 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  const handleDelete = async (id: number) => {
+  // 1. ユーザーに確認（うっかり削除防止！）
+  if (!confirm('この投稿を削除してもよろしいですか？')) return;
+
+  try {
+    // 2. Supabaseに「このIDのデータを消してや」と頼む
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    // 3. 画面を更新する（一覧から消したデータを反映）
+    alert('削除しました！');
+    setPosts((prevPosts) => prevPosts.filter((post) => post.id !== id)); // 削除したID以外を残す
+    router.refresh(); // Next.jsならこれで画面を最新の状態にできるで
+    
+  } catch (error: any) {
+    console.error('削除失敗:', error);
+    alert('削除に失敗しましたわ…');
+  }
+};
 
   //「いつ」動かすかを決めるスイッチ
   useEffect(() => {
@@ -133,12 +164,28 @@ export default function Home() {
                   </p>
                 </div>
                 
-                <div className="flex justify-end items-center border-t border-gray-100 pt-3">
-                  <span className="text-[10px] text-gray-400 font-bold">
-                    {/* 日付の変換 */}
+                <div className="flex justify-end items-center border-t border-gray-100 pt-3 gap-3">
+                {/* 編集ボタン */}
+                  <button 
+                    onClick={() => handleEdit(post.id)}
+                    className="text-[11px] font-bold text-slate-500 hover:text-orange-600 active:scale-90 transition-all cursor-pointer"
+                  >
+                    編集
+                  </button>
+
+                  {/* 削除ボタン */}
+                  <button 
+                    onClick={() => handleDelete(post.id)}
+                    className="text-[11px] font-bold text-slate-400 hover:text-red-500 active:scale-90 transition-all cursor-pointer"
+                  >
+                    削除
+                  </button>
+
+                  {/* 日付（これの左側にボタンを並べた） */}
+                  <span className="text-[10px] text-gray-400 font-bold ml-auto">
                     {new Date(post.created_at).toLocaleString('ja-JP')}
                   </span>
-                </div>
+              </div>
               </article>
             ))
           )}
