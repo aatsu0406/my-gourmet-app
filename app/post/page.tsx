@@ -4,20 +4,59 @@ import { useState, useEffect, SubmitEvent } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';   //URLの ? 以降についている『おまけデータ（クエリパラメータ）』を、JavaScriptで読み取るための道具
+
+// 共通のラベルパーツ
+const FormLabel = ({ children }: { children: React.ReactNode }) => (
+  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-black">
+    {children}
+  </label>
+);
+// 評価の選択肢と最大値を定義（5段階評価を柔軟に変更できるように）
+const RATING_OPTIONS = [5, 4, 3, 2, 1];
+const MAX_RATING = RATING_OPTIONS.length; // 最高評価の数（★の数）
 
 export default function PostPage() {
   const [shopName, setShopName] = useState(''); // 店舗名の入力内容を覚える
   const [comment, setComment] = useState(''); // コメントの入力内容を覚える
-  const [rating, setRating] = useState(5);  // 評価（★の数）を覚える。初期値は5
+  const [rating, setRating] = useState(RATING_OPTIONS[0]);  // 評価（★の数）を覚える。初期値は最高評価にしておく
   const [tagInput, setTagInput] = useState(''); // 今入力中の「タグ1つ分」の文字
   const [tags, setTags] = useState<string[]>([]); // 確定して並んでいる「タグのリスト」
   const [loading, setLoading] = useState(false);  // 投稿ボタン連打防止用の「通信中フラグ」
   const [mounted, setMounted] = useState(false);  // 画面がブラウザで表示されたか判定
   const router = useRouter(); // 投稿後に画面を切り替えるための道具
+  const searchParams = useSearchParams(); // URLのクエリパラメータを読み取るための道具
+  const editId = searchParams.get('id'); // URLの ?id= を取得
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+
+    // 編集モード（editIdがある時）の処理
+    if (editId) {
+      const fetchPostData = async () => {
+        const { data, error } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            post_tags (
+              tags (tag_name)
+            )
+          `)
+          .eq('id', editId)
+          .single();  //取れたデータをオブジェクトとして受け取る
+
+        if (data) {
+          setShopName(data.shop_name);
+          setComment(data.comment);
+          setRating(data.rating);
+          // タグも配列にしてセット
+          const existingTags = data.post_tags.map((pt: any) => pt.tags.tag_name);
+          setTags(existingTags);
+        }
+      };
+      fetchPostData();
+    }
+  }, [editId]); // editIdが変わるたびにチェック
 
   //タグを確定させる
   const addTag = (e: React.KeyboardEvent) => {
@@ -39,8 +78,23 @@ export default function PostPage() {
     e.preventDefault(); // 画面のリロードを防ぐ
     if (!supabase) return;  //DBとの接続準備ができていなかったら、ここで処理を中止
     setLoading(true);  // 「投稿中...」状態にしてボタンを無効化
-
+    
     try {
+      let currentPostId = editId; // URLにIDがあればそれを編集用IDとして使う
+
+      if (editId) {
+        // --- 編集（更新）モード ---
+        const { error: updateError } = await supabase
+          .from('posts')
+          .update({ shop_name: shopName, comment: comment, rating: rating })
+          .eq('id', editId);  // ← これを忘れると全データが書き換わるから要注意！
+        
+        if (updateError) throw updateError;
+        
+        // 既存のタグの紐付けを一旦消して作り直すのが一番確実
+        await supabase.from('post_tags').delete().eq('post_id', editId);
+      } else {
+        // --- 新規投稿モード ---
       // 1. postsテーブルへ保存
       const { data: postData, error: postError } = await supabase
         .from('posts')
@@ -48,8 +102,9 @@ export default function PostPage() {
         .select() // 保存した直後のデータ（IDなど）を返してもらう
         .single();  // 1件だけなのでオブジェクトとして受け取る
 
-      if (postError) throw postError; // 失敗したらcatchブロックへ飛ばす
-
+        if (postError) throw postError; // 失敗したらcatchブロックへ飛ばす
+          currentPostId = postData.id;  // これが「この投稿のID！」今後のタグの紐付けで必要になるから、変数に入れて覚えておく
+      }
       // 2. タグの保存と紐付け
       if (tags.length > 0) {
         for (const tagName of tags) { // タグの数だけ繰り返す
@@ -64,11 +119,13 @@ export default function PostPage() {
           // 中間テーブルに「この投稿」と「このタグ」のIDをセットで保存
           await supabase
             .from('post_tags')
-            .insert({ post_id: postData.id, tag_id: tagData.id });
+            .insert({ post_id: currentPostId, tag_id: tagData.id });
         }
       }
 
+      alert(editId ? '更新しました！' : '投稿しました！');
       router.push('/');   // ホーム画面へ自動で戻る（Next.jsの便利な機能）
+      router.refresh(); // ホームに戻った時に最新にする
       // 入力欄をリセット（念のため）
       setShopName('');
       setComment('');
@@ -102,27 +159,27 @@ export default function PostPage() {
             <h1 className="text-3xl font-black tracking-tighter text-white">ぐるログ</h1>
             <p className="text-orange-100 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">こだわりの一品を、忘れないうちに。</p>
           </div>
-
+          {/* formタグで入力フォームを囲むのは、送信イベントをまとめて管理するため */}
           <form onSubmit={handleSubmit} className="p-8 space-y-6">
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-black">店舗名</label>
+              <FormLabel>店舗名</FormLabel>
               <input
                 type="text"
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none font-bold text-black"
-                value={shopName}
+                value={shopName}  //入力欄にリアルタイムでStateの内容を反映させる
                 onChange={(e) => setShopName(e.target.value)} // 文字が打たれるたびにStateを更新
-                placeholder="店舗名を入力"
-                required
+                placeholder="店舗名を入力"  //入力欄背景のヒントテキスト
+                required  //入力自動チェック機能（空欄のまま送信しようとすると警告が出る）
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-black">ハッシュタグ追加</label>
+              <FormLabel>ハッシュタグ追加</FormLabel>
               <div className="flex flex-wrap gap-2 mb-3">
                 {tags.map((tag, i) => (
                   <span key={i} className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center shadow-sm">
                     #{tag}
-                    <button type="button" onClick={() => removeTag(i)} className="ml-2">×</button>
+                    <button type="button" onClick={() => removeTag(i)} className="ml-2 cursor-pointer">×</button>
                   </span>
                 ))}
               </div>
@@ -131,26 +188,26 @@ export default function PostPage() {
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none text-sm font-bold text-black"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)} // 文字が打たれるたびにStateを更新
-                onKeyDown={addTag}
+                onKeyDown={addTag}  //キーボードのキーが何か押された瞬間に addTag 関数を実行してね(エンターキーのみを見張るイベントがないから、addTag関数の中でエンターキーかどうかを判断する)
                 placeholder="ハッシュタグを入力してEnter"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-black">評価</label>
+              <FormLabel>評価</FormLabel>
               <select 
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none font-bold text-orange-500"
                 value={rating}
                 onChange={(e) => setRating(Number(e.target.value))} 
               >
-                {[5, 4, 3, 2, 1].map(v => (
-                  <option key={v} value={v}>{'★'.repeat(v)}{'☆'.repeat(5-v)}</option>
+                {RATING_OPTIONS.map(ratingValue => (
+                  <option key={ratingValue} value={ratingValue}>{'★'.repeat(ratingValue)}{'☆'.repeat(MAX_RATING-ratingValue)}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-black">内容</label>
+              <FormLabel>内容</FormLabel>
               <textarea
                 className="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl h-32 focus:ring-4 focus:ring-orange-100 outline-none text-sm font-medium resize-none text-black"
                 value={comment}
@@ -160,13 +217,13 @@ export default function PostPage() {
             </div>
 
             <button 
-              type="submit" 
+              type="submit"   //送信スイッチ（エンターでも押せるように）
               disabled={loading} // 通信中はボタンを押せなくする
               className={`w-full py-5 rounded-2xl font-black text-white shadow-lg transition-all ${
-                loading ? 'bg-slate-300' : 'bg-zinc-400 hover:bg-orange-600 active:scale-95'
+                loading ? 'bg-slate-300' : 'bg-slate-400 active:brightness-110 active:scale-95'
               }`}
             >
-              {loading ? '投稿しています...' : '投稿する'}
+              {loading ? '保存中...' : (editId ? '更新する' : '投稿する')}
             </button>
           </form>
         </div>
