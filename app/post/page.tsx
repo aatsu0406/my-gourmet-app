@@ -25,6 +25,8 @@ export default function PostPage() {
   const [tags, setTags] = useState<string[]>([]); // 確定して並んでいる「タグのリスト」
   const [loading, setLoading] = useState(false);  // 投稿ボタン連打防止用の「通信中フラグ」
   const [mounted, setMounted] = useState(false);  // 画面がブラウザで表示されたか判定
+  const [imageFile, setImageFile] = useState<File | null>(null); // 画像ファイルの状態を追加
+  const [previewUrl, setPreviewUrl] = useState<string>(''); // 画面に表示する用の画像URLの状態を追加
   const router = useRouter(); // 投稿後に画面を切り替えるための道具
   const searchParams = useSearchParams(); // URLのクエリパラメータを読み取るための道具
   const editId = searchParams.get('id'); // URLの ?id= を取得
@@ -75,6 +77,18 @@ export default function PostPage() {
     setTags(tags.filter((_, index) => index !== indexToRemove));  // 指定した番号以外を残す（＝削除）
   };
 
+  // 画像を選んだ時の処理
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 1. 選択されたファイルを取り出す
+    const file = e.target.files?.[0];
+    if (!file) return; // ファイルが選ばれなかった場合は何もしない
+    // 2. 「サーバーに送る用」の状態を更新
+    setImageFile(file);
+    // 3. 「画面にプレビュー出す用」のURLを作る
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+  };
+
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {  //「フォームが送信された」というイベント情報 e を受け取る
     e.preventDefault(); // 画面のリロードを防ぐ
     if (!supabase) return;  //DBとの接続準備ができていなかったら、ここで処理を中止
@@ -83,13 +97,40 @@ export default function PostPage() {
     const loadToast = toast.loading(editId ? '更新中...' : '投稿中...');
     
     try {
+      //画像アップロード処理
+      let finalImageUrl = ''; // DBに保存するためのURL変数
+
+      // 画像が新しく選択されている場合のみアップロードを実行
+      if (imageFile) {
+        // ファイル名が被らないように「日時_ファイル名」にする
+        const fileName = `${Date.now()}_${imageFile.name}`;
+        
+        // Supabase Storageの 'images' バケットに放り込む！
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from('images')
+          .upload(fileName, imageFile);
+
+        if (storageError) throw storageError;
+
+        // アップロードしたファイルの「公開用URL」をゲットする
+        const { data: publicUrlData } = supabase.storage
+          .from('images')
+          .getPublicUrl(fileName);
+
+        finalImageUrl = publicUrlData.publicUrl;
+      }
+
       let currentPostId = editId; // URLにIDがあればそれを編集用IDとして使う
 
       if (editId) {
         // --- 編集（更新）モード ---
+        const updateData: any = { shop_name: shopName, comment: comment, rating: rating };
+        if (finalImageUrl) {
+          updateData.image_url = finalImageUrl; // 画像URLも更新データに含める
+        }
         const { error: updateError } = await supabase
           .from('posts')
-          .update({ shop_name: shopName, comment: comment, rating: rating })
+          .update(updateData)
           .eq('id', editId);  // ← これを忘れると全データが書き換わるから要注意！
         
         if (updateError) throw updateError;
@@ -101,7 +142,7 @@ export default function PostPage() {
       // 1. postsテーブルへ保存
       const { data: postData, error: postError } = await supabase
         .from('posts')
-        .insert([{ shop_name: shopName, comment: comment, rating: rating }])
+        .insert([{ shop_name: shopName, comment: comment, rating: rating, image_url: finalImageUrl }]) // 画像URLも一緒に保存する
         .select() // 保存した直後のデータ（IDなど）を返してもらう
         .single();  // 1件だけなのでオブジェクトとして受け取る
 
@@ -203,6 +244,47 @@ export default function PostPage() {
                 onKeyDown={addTag}  //キーボードのキーが何か押された瞬間に addTag 関数を実行してね(エンターキーのみを見張るイベントがないから、addTag関数の中でエンターキーかどうかを判断する)
                 placeholder="ハッシュタグを入力してEnter"
               />
+            </div>
+            
+            {/* --- 写真アップロードセクション --- */}
+            <div>
+              <FormLabel>写真</FormLabel>
+              <div className="flex flex-col gap-4">
+                {/* プレビュー画像があれば表示する */}
+                {previewUrl && (
+                  <div className="relative w-full h-52 group">
+                    <img 
+                      src={previewUrl} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover rounded-2xl shadow-md border-2 border-white"
+                    />
+                    {/* キャンセルボタン */}
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setPreviewUrl(''); }}
+                      className="absolute top-2 right-2 bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {/* ファイル選択ボタン */}
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="block w-full text-sm text-slate-500
+                      file:mr-4 file:py-3 file:px-6
+                      file:rounded-2xl file:border-0
+                      file:text-sm file:font-black
+                      file:bg-orange-50 file:text-orange-600
+                      hover:file:bg-orange-100
+                      cursor-pointer transition-all"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
