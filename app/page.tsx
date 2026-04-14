@@ -204,53 +204,65 @@ export default function Home() {
             </div>
           ) : (
             //map関数
-            posts.map((post) => ( // 1件以上あるとき、データの数だけ繰り返す
-              <article key={post.id} className="bg-white p-6 rounded-3xl shadow-sm border border-orange-50 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-3">
-                  {/* 店名・評価・タグの表示 */}
-                  <h2 className="text-2xl font-bold text-gray-800">{post.shop_name}</h2>
-                  <div className="flex items-center bg-orange-100 px-3 py-1 rounded-full">
-                    <span className="text-orange-500 text-lg">★</span>
-                    <span className="text-orange-600 font-black ml-1">{post.rating}</span>
+            posts.map((post) => (
+              <article key={post.id} className="bg-white rounded-3xl shadow-sm border border-orange-50 hover:shadow-md transition-shadow overflow-hidden">
+                
+                {/* --- 画像表示エリア --- */}
+                {post.image_url ? (
+                  <div className="w-full h-64 overflow-hidden border-b border-orange-50">
+                    <img 
+                      src={post.image_url} 
+                      alt={post.shop_name} 
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ) : (
+                  /* 画像がない場合は、上部に少しだけアクセントの色を付ける */
+                  <div className="w-full h-2 bg-gradient-to-r from-orange-200 to-orange-100" />
+                )}
+
+                {/* --- コンテンツエリア（余白を p-6 で確保） --- */}
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-3">
+                    <h2 className="text-2xl font-bold text-gray-800">{post.shop_name}</h2>
+                    <div className="flex items-center bg-orange-100 px-3 py-1 rounded-full">
+                      <span className="text-orange-500 text-lg">★</span>
+                      <span className="text-orange-600 font-black ml-1">{post.rating}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {post.post_tags?.map((pt: any, i: number) => (
+                      <span key={i} className="text-[10px] font-black text-white bg-orange-400 px-3 py-1 rounded-full">
+                        #{pt.tags?.tag_name}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-2xl mb-4">
+                    <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                      {post.comment || "（コメントなし）"}
+                    </p>
+                  </div>
+                  
+                  <div className="flex justify-end items-center border-t border-gray-100 pt-3 gap-3">
+                    <button 
+                      onClick={() => handleEdit(post.id)}
+                      className="text-[11px] font-bold text-slate-500 hover:text-orange-600 active:scale-90 transition-all cursor-pointer"
+                    >
+                      編集
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(post.id)}
+                      className="text-[11px] font-bold text-slate-400 hover:text-red-500 active:scale-90 transition-all cursor-pointer"
+                    >
+                      削除
+                    </button>
+                    <span className="text-[10px] text-gray-400 font-bold ml-auto">
+                      {new Date(post.created_at).toLocaleString('ja-JP')}
+                    </span>
                   </div>
                 </div>
-                
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {post.post_tags?.map((pt: any, i: number) => (
-                    <span key={i} className="text-[10px] font-black text-white bg-orange-400 px-3 py-1 rounded-full">
-                      #{pt.tags?.tag_name}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-2xl mb-4">
-                  <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
-                    {post.comment || "（コメントなし）"}
-                  </p>
-                </div>
-                
-                <div className="flex justify-end items-center border-t border-gray-100 pt-3 gap-3">
-                {/* 編集ボタン */}
-                  <button 
-                    onClick={() => handleEdit(post.id)}
-                    className="text-[11px] font-bold text-slate-500 hover:text-orange-600 active:scale-90 transition-all cursor-pointer"
-                  >
-                    編集
-                  </button>
-
-                  {/* 削除ボタン */}
-                  <button 
-                    onClick={() => handleDelete(post.id)}
-                    className="text-[11px] font-bold text-slate-400 hover:text-red-500 active:scale-90 transition-all cursor-pointer"
-                  >
-                    削除
-                  </button>
-
-                  {/* 日付（これの左側にボタンを並べた） */}
-                  <span className="text-[10px] text-gray-400 font-bold ml-auto">
-                    {new Date(post.created_at).toLocaleString('ja-JP')}
-                  </span>
-              </div>
               </article>
             ))
           )}
