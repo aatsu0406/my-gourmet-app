@@ -5,6 +5,7 @@ import { supabase } from '../../src/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';   //URLの ? 以降についている『おまけデータ（クエリパラメータ）』を、JavaScriptで読み取るための道具
+import { Toaster, toast } from 'react-hot-toast';  // トースト通知を出すための道具
 
 // 共通のラベルパーツ
 const FormLabel = ({ children }: { children: React.ReactNode }) => (
@@ -78,6 +79,8 @@ export default function PostPage() {
     e.preventDefault(); // 画面のリロードを防ぐ
     if (!supabase) return;  //DBとの接続準備ができていなかったら、ここで処理を中止
     setLoading(true);  // 「投稿中...」状態にしてボタンを無効化
+    // 1.「保存中」のトーストを出す
+    const loadToast = toast.loading(editId ? '更新中...' : '投稿中...');
     
     try {
       let currentPostId = editId; // URLにIDがあればそれを編集用IDとして使う
@@ -123,9 +126,15 @@ export default function PostPage() {
         }
       }
 
-      alert(editId ? '更新しました！' : '投稿しました！');
-      router.push('/');   // ホーム画面へ自動で戻る（Next.jsの便利な機能）
-      router.refresh(); // ホームに戻った時に最新にする
+      //  2. 成功トーストを出す（IDを指定して、読み込み中を上書き！）
+      toast.success(editId ? '更新しました' : '投稿しました', {
+        id: loadToast,
+      });
+      // 3. すぐに画面を切り替えず、1秒だけ「成功」を見せてから戻る
+      setTimeout(() => {
+        router.push('/');   // ホーム画面へ自動で戻る（Next.jsの便利な機能）
+        router.refresh(); // ホームに戻った時に最新にする
+      }, 1000); // 1000ミリ秒＝1秒の遅延を設定
       // 入力欄をリセット（念のため）
       setShopName('');
       setComment('');
@@ -133,7 +142,9 @@ export default function PostPage() {
       
     } catch (error: any) {
       console.error('保存失敗:', error);
-      alert('エラーが発生しました：\n' + (error.message || '不明なエラー'));
+      toast.error('保存に失敗しました…\n' + (error.message || ''), {
+        id: loadToast,
+      });
     } finally {
       setLoading(false);
     }
@@ -143,6 +154,7 @@ export default function PostPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4">
+    <Toaster position="top-center" />
       <div className="max-w-lg mx-auto">
         <div className="mb-6">
           <Link href="/" className="inline-flex items-center gap-2 text-stone-500 hover:text-orange-600 transition-colors group">
