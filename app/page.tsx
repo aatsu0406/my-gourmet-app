@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'; // 画面遷移のための道具
 import { Toaster, toast } from 'react-hot-toast'; // トースト通知のための部品と道具
 import { formatDistanceToNow } from 'date-fns'; // 日付を「〇〇前」に変換するための部品
 import { ja } from 'date-fns/locale'; // 日本語ロケールのインポート （これも日付表示のための部品）
+import { TagBadge } from './components/TagBadge';
 
 //データの器を用意
 export default function Home() {
@@ -298,9 +299,9 @@ export default function Home() {
                   
                   <div className="flex flex-wrap gap-2 mb-4">
                     {post.post_tags?.map((pt: any, i: number) => (
-                      <span key={i} className="text-[10px] font-black text-white bg-orange-400 px-3 py-1 rounded-full">
-                        #{pt.tags?.tag_name}
-                      </span>
+                      <TagBadge key={pt.post_id && pt.tag_id ? `${pt.post_id}-${pt.tag_id}` : i}
+                      tagName={pt.tags?.tag_name}
+                      />
                     ))}
                   </div>
 
